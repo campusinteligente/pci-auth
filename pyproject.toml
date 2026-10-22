@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pci-auth"
+description = "Login pelo AuthService e auto-registro de aplicações para os serviços do PCI – Campus Inteligente"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Django>=4.2",
+    "requests>=2.31",
+    "PyJWT[crypto]>=2.8",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repositorio = "https://github.com/campusinteligente/pci-auth"
+
+[tool.setuptools.dynamic]
+version = { attr = "pci_auth.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["pci_auth*"]
