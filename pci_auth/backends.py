@@ -117,7 +117,7 @@ class AuthServiceBackend:
     def atualizar_usuario(self, username, claims):
         user, criado = get_user_model().objects.get_or_create(username=username)
         novos = {
-            "email": claims.get("email", ""),
+            "email": claims.get("email") or "",  # AuthService manda null para quem não tem e-mail
             "is_superuser": claims.get("is_superuser", False),
             "is_staff": claims.get("is_staff", False),
         }
