@@ -8,6 +8,8 @@ se apresentar ao AuthService: quem ele é e quais permissões existem nele.
 
 - `pci_auth.backends.AuthServiceBackend`: login com usuário e senha no AuthService, mesmo comportamento
   do backend copiado (grupo exigido, usuário local sem senha, grupos sincronizados).
+- `pci_auth.permissoes`: `pode`, `@exige_permissao`, `ExigePermissaoMixin`, `permissao_drf` e o filtro
+  `pode` nos templates, com as permissões que o AuthService calculou para o usuário (a partir da 0.2.0).
 - `manage.py sincronizar_permissoes`: roda no deploy. Registra a aplicação (fica pendente até alguém
   aprovar no admin do AuthService) e, depois de aprovada, mantém as permissões declaradas em dia.
 
@@ -18,7 +20,7 @@ se apresentar ao AuthService: quem ele é e quais permissões existem nele.
 
 ```
 # requirements.txt
-pci-auth @ git+https://github.com/campusinteligente/pci-auth@v0.1.0
+pci-auth @ git+https://github.com/campusinteligente/pci-auth@v0.2.0
 ```
 
 Fixe sempre uma tag: cada serviço atualiza quando quiser.
@@ -117,6 +119,43 @@ Para ver o que seria enviado, sem chamar nada: `python manage.py sincronizar_per
   token acabou de vir do próprio AuthService). Com ela, token de outra chave é recusado.
 - Os checks do Django (`manage.py check`) avisam sobre configuração errada; o comando
   `sincronizar_permissoes` não roda com eles.
+
+## Exigindo permissões (0.2.0)
+
+Com o `client_id` configurado, o token do login traz as permissões do usuário nesta aplicação
+(papéis e atribuições ficam no admin do AuthService). O backend grava em `PermissoesUsuario` a cada
+login (`manage.py migrate` cria a tabela); mudança feita no AuthService vale a partir do próximo login.
+
+```python
+from pci_auth.permissoes import ExigePermissaoMixin, exige_permissao, permissao_drf, pode, escopo
+
+@exige_permissao("movimentacao.registrar")              # várias = exige todas
+def registrar_saida(request): ...
+
+class EditarProduto(ExigePermissaoMixin, UpdateView):
+    permissao_exigida = "produto.editar"                # ou uma tupla
+
+class ProdutoViewSet(ModelViewSet):
+    permission_classes = [permissao_drf("produto.ver")]
+
+if pode(request.user, "movimentacao.registrar", no="setor_sub:7"): ...
+escopo(request.user, "movimentacao.registrar")          # None = tudo; {"setor_sub:7"}; set() = não pode
+```
+
+```django
+{% load pci_auth %}
+{% if request.user|pode:"produto.editar" %}<a href="...">Editar</a>{% endif %}
+```
+
+- Anônimo vai para o login; sem a permissão, 403. Superusuário sempre pode.
+- Permissão com escopo vale só nos setores listados (`setor_super:<id>`, `setor:<id>`,
+  `setor_sub:<id>`, ids do AuthService). Sem `no`, basta valer em algum lugar.
+- **Sem registro, ninguém (fora o superusuário) pode nada**: isso vale para a aplicação sem
+  `client_id` e para o settings de dev sem o app `pci_auth`. Só exija permissões depois que a aplicação
+  estiver aprovada e os papéis atribuídos no AuthService.
+- Aplicação com "Permissões no token" desligado no AuthService: o backend busca em
+  `GET /api/permissoes/me/`. Se a busca falhar, o usuário entra sem permissões (o erro vai para o log).
+- `REQUIRED_GROUP` continua valendo para entrar; as permissões decidem o que cada um faz lá dentro.
 
 ## Trocando o backend copiado
 

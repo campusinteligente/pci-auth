@@ -41,6 +41,10 @@ class LoginTests(TestCase):
         self.assertFalse(user.has_usable_password())
         self.assertEqual(list(user.groups.values_list("name", flat=True)), ["Novo"])
 
+    def test_email_nulo_vira_vazio(self):
+        with simular_post(resposta(200, {"access": access(email=None)})):
+            self.assertEqual(entrar().email, "")
+
     def test_sem_usuario_ou_senha_nem_chama_o_authservice(self):
         with simular_post() as post:
             self.assertIsNone(authenticate(None, username="maria", password=""))
@@ -114,7 +118,7 @@ class AssinaturaTests(TestCase):
     @override_settings(PCI_AUTH={"AUTHSERVICE_URL": URL, "CHAVE_PUBLICA": PUBLICA})
     def test_claim_aud_nao_atrapalha(self):
         # Fase 2: o token de uma aplicação identificada vem com aud = slug.
-        with simular_post(resposta(200, {"access": access(aud="produtos")})):
+        with simular_post(resposta(200, {"access": access(aud="produtos", permissoes=[])})):
             self.assertIsNotNone(entrar())
 
     @override_settings(PCI_AUTH={"AUTHSERVICE_URL": URL}, SIMPLE_JWT={"VERIFYING_KEY": PUBLICA})

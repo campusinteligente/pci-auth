@@ -7,6 +7,8 @@ Fluxo:
 3. Exige REQUIRED_GROUP (superusuário sempre passa)
 4. Cria ou atualiza o User local, sem senha usável
 5. Sincroniza os grupos; grupo criado agora recebe as permissões de PERMISSOES_POR_GRUPO
+6. Guarda as permissões da aplicação (claims permissoes/permissoes_escopo, ou GET
+   /api/permissoes/me/ quando o token só traz o aud). Sem aud, apaga o que havia.
 """
 
 import logging
@@ -16,7 +18,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 
 from pci_auth import conf
-from pci_auth.cliente import AuthServiceIndisponivel, post
+from pci_auth.cliente import AuthServiceIndisponivel, minhas_permissoes, post
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +50,9 @@ class AuthServiceBackend:
             return None
         if request is not None and hasattr(request, "session") and conf.valor("SALVAR_TOKEN_NA_SESSAO"):
             request.session["access_token"] = access
-        return self.atualizar_usuario(username, claims)
+        user = self.atualizar_usuario(username, claims)
+        self.guardar_permissoes(user, claims, access)
+        return user
 
     def get_user(self, user_id):
         User = get_user_model()
@@ -113,7 +117,7 @@ class AuthServiceBackend:
     def atualizar_usuario(self, username, claims):
         user, criado = get_user_model().objects.get_or_create(username=username)
         novos = {
-            "email": claims.get("email", ""),
+            "email": claims.get("email") or "",  # AuthService manda null para quem não tem e-mail
             "is_superuser": claims.get("is_superuser", False),
             "is_staff": claims.get("is_staff", False),
         }
@@ -136,3 +140,36 @@ class AuthServiceBackend:
             grupos.append(grupo)
         user.groups.set(grupos)
         return user
+
+    def guardar_permissoes(self, user, claims, access):
+        """Grava PermissoesUsuario. Falha ao buscar = nenhuma permissão (nunca as antigas)."""
+        from django.apps import apps
+
+        if not apps.is_installed("pci_auth"):
+            return
+        from pci_auth.models import PermissoesUsuario
+        from pci_auth.permissoes import esquecer
+
+        esquecer(user)
+        aud = claims.get("aud")
+        if not aud:
+            PermissoesUsuario.objects.filter(usuario=user).delete()
+            return
+        if "permissoes" in claims:
+            permissoes, escopo = claims.get("permissoes") or [], claims.get("permissoes_escopo") or {}
+        else:
+            permissoes, escopo = self.buscar_permissoes(access)
+        PermissoesUsuario.objects.update_or_create(
+            usuario=user, defaults={"aplicacao": aud, "permissoes": permissoes, "escopo": escopo}
+        )
+
+    def buscar_permissoes(self, access):
+        try:
+            status, dados = minhas_permissoes(access)
+        except AuthServiceIndisponivel as e:
+            logger.error("Permissões não carregadas: %s", e)
+            return [], {}
+        if status != 200:
+            logger.error("AuthService respondeu %s em /api/permissoes/me/; usuário fica sem permissões.", status)
+            return [], {}
+        return dados.get("permissoes") or [], dados.get("permissoes_escopo") or {}

@@ -11,6 +11,15 @@ class AuthServiceIndisponivel(Exception):
 
 def post(caminho, corpo, cabecalhos=None):
     """POST em AUTHSERVICE_URL + caminho. Devolve (status, corpo JSON)."""
+    return _chamar("post", caminho, cabecalhos, json=corpo)
+
+
+def get(caminho, cabecalhos=None):
+    """GET em AUTHSERVICE_URL + caminho. Devolve (status, corpo JSON)."""
+    return _chamar("get", caminho, cabecalhos)
+
+
+def _chamar(metodo, caminho, cabecalhos, **kwargs):
     url = conf.authservice_url()
     if not url:
         raise AuthServiceIndisponivel("AUTHSERVICE_URL não configurado.")
@@ -18,7 +27,9 @@ def post(caminho, corpo, cabecalhos=None):
     if conf.valor("HOST"):
         cabecalhos["Host"] = conf.valor("HOST")
     try:
-        resposta = requests.post(f"{url}{caminho}", json=corpo, headers=cabecalhos, timeout=conf.valor("TIMEOUT"))
+        resposta = getattr(requests, metodo)(
+            f"{url}{caminho}", headers=cabecalhos, timeout=conf.valor("TIMEOUT"), **kwargs
+        )
     except requests.RequestException as e:
         raise AuthServiceIndisponivel(f"Não foi possível falar com o AuthService em {url}: {e}") from e
     try:
@@ -56,3 +67,8 @@ def sincronizar(client_id, client_secret):
     """Sincroniza dados declarados e permissões de uma aplicação já aprovada."""
     corpo = {"client_id": client_id, "client_secret": client_secret, **declaracao()}
     return post("/api/aplicacoes/sincronizar/", corpo)
+
+
+def minhas_permissoes(access):
+    """GET /api/permissoes/me/ com o access do usuário (aplicação pelo aud do token)."""
+    return get("/api/permissoes/me/", {"Authorization": f"Bearer {access}"})
