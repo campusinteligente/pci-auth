@@ -20,7 +20,7 @@ se apresentar ao AuthService: quem ele é e quais permissões existem nele.
 
 ```
 # requirements.txt
-pci-auth @ git+https://github.com/campusinteligente/pci-auth@v0.2.0
+pci-auth @ git+https://github.com/campusinteligente/pci-auth@v0.3.0
 ```
 
 Fixe sempre uma tag: cada serviço atualiza quando quiser.
@@ -68,6 +68,7 @@ Todas as chaves:
 | `APP_LABELS` | `["app"]` | De quais apps vêm as permissões de `"all"` (ex.: `["app", "paginas_pci"]`) |
 | `CHAVE_PUBLICA` | `SIMPLE_JWT["VERIFYING_KEY"]` | PEM do AuthService; com ela a assinatura do token é conferida |
 | `SALVAR_TOKEN_NA_SESSAO` | `True` | Guarda o access em `request.session["access_token"]` |
+| `EXIGIR_PERMISSOES` | `True` | `False` libera as checagens de permissão para qualquer usuário logado (implantação gradual) |
 | `HOST` | `"localhost"` | Cabeçalho `Host` nas chamadas (o backend copiado sempre mandou esse); `None` não manda |
 | `TIMEOUT` | `10` | Segundos por chamada |
 
@@ -156,6 +157,10 @@ escopo(request.user, "movimentacao.registrar")          # None = tudo; {"setor_s
 - Aplicação com "Permissões no token" desligado no AuthService: o backend busca em
   `GET /api/permissoes/me/`. Se a busca falhar, o usuário entra sem permissões (o erro vai para o log).
 - `REQUIRED_GROUP` continua valendo para entrar; as permissões decidem o que cada um faz lá dentro.
+- **Implantação gradual** (0.3.0): `PCI_AUTH["EXIGIR_PERMISSOES"] = False` faz todas as checagens
+  liberarem qualquer usuário logado e ativo (como antes). Marque as views, faça o deploy, atribua os
+  papéis no AuthService (o simulador mostra o resultado) e só então ligue, por exemplo
+  `config("PCI_AUTH_EXIGIR_PERMISSOES", default=False, cast=bool)` no settings e `True` no `.env`.
 
 ## Trocando o backend copiado
 

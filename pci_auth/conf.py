@@ -36,6 +36,9 @@ PADROES = {
     "PERMISSOES_POR_GRUPO": {},  # {"Servico_Gerente": "all", "Servico_Operador": ["view_x", ...]}
     "APP_LABELS": ["app"],
     "SALVAR_TOKEN_NA_SESSAO": True,
+    # Permissões (pci_auth.permissoes). False: checagens liberam qualquer usuário logado e ativo,
+    # para o serviço ir ao ar com as views marcadas antes de os papéis estarem atribuídos.
+    "EXIGIR_PERMISSOES": True,
 }
 
 _LEGADO = {
