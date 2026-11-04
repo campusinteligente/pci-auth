@@ -114,7 +114,7 @@ class AssinaturaTests(TestCase):
     @override_settings(PCI_AUTH={"AUTHSERVICE_URL": URL, "CHAVE_PUBLICA": PUBLICA})
     def test_claim_aud_nao_atrapalha(self):
         # Fase 2: o token de uma aplicação identificada vem com aud = slug.
-        with simular_post(resposta(200, {"access": access(aud="produtos")})):
+        with simular_post(resposta(200, {"access": access(aud="produtos", permissoes=[])})):
             self.assertIsNotNone(entrar())
 
     @override_settings(PCI_AUTH={"AUTHSERVICE_URL": URL}, SIMPLE_JWT={"VERIFYING_KEY": PUBLICA})
