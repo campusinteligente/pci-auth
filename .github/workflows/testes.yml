@@ -25,6 +25,6 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Dependências
-        run: pip install "Django==${{ matrix.django }}" djangorestframework .
+        run: pip install "Django==${{ matrix.django }}" .
       - name: Testes
         run: python runtests.py

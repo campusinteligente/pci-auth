@@ -5,7 +5,8 @@ from django.http import HttpResponse
 from django.template import Context, Template
 from django.test import RequestFactory, TestCase, override_settings
 from django.views import View
-from unittest import mock
+import importlib.util
+from unittest import mock, skipUnless
 
 from pci_auth.models import PermissoesUsuario
 from pci_auth.permissoes import ExigePermissaoMixin, escopo, exige_permissao, pode, permissao_drf
@@ -135,6 +136,7 @@ class PodeTests(TestCase):
             Tela.as_view()(self.requisicao(self.sem_registro))
         self.assertEqual(Tela.as_view()(self.requisicao(AnonymousUser())).status_code, 302)
 
+    @skipUnless(importlib.util.find_spec("rest_framework"), "DRF não instalado")
     def test_drf(self):
         classe = permissao_drf("produto.ver")
         self.assertTrue(classe().has_permission(self.requisicao(self.user), None))
