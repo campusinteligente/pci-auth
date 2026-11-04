@@ -95,6 +95,14 @@ class PodeTests(TestCase):
         self.user.is_active = False
         self.assertFalse(pode(self.user, "produto.ver"))
 
+    def test_exigencia_desligada_libera_quem_esta_logado(self):
+        with self.settings(PCI_AUTH={"EXIGIR_PERMISSOES": False}):
+            self.assertTrue(pode(self.sem_registro, "produto.editar", no="setor_sub:1"))
+            self.assertIsNone(escopo(self.user, "movimentacao.registrar"))
+            self.assertFalse(pode(AnonymousUser(), "produto.ver"))
+            self.sem_registro.is_active = False
+            self.assertFalse(pode(self.sem_registro, "produto.ver"))
+
     def test_uma_consulta_por_objeto(self):
         with self.assertNumQueries(1):
             pode(self.user, "produto.ver")

@@ -14,6 +14,8 @@ Regras:
 - Permissão com escopo vale só nos nós listados ("setor_super:1", "setor:3", "setor_sub:7").
   Sem `no`, basta valer em algum lugar.
 - Sem o app `pci_auth` em INSTALLED_APPS (settings de dev com login local), só o superusuário passa.
+- PCI_AUTH["EXIGIR_PERMISSOES"] = False: tudo liberado para qualquer usuário logado e ativo
+  (implantação gradual: marque as views, atribua os papéis no AuthService, depois ligue).
 """
 
 from functools import wraps
@@ -22,6 +24,8 @@ from django.apps import apps
 from django.contrib.auth.mixins import AccessMixin
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
+
+from pci_auth import conf
 
 _CACHE = "_pci_auth_permissoes"
 _SEM_REGISTRO = object()
@@ -50,7 +54,7 @@ def escopo(user, codigo):
     """None = vale em tudo; set de nós = só neles; set vazio = não tem a permissão."""
     if not getattr(user, "is_authenticated", False) or not user.is_active:
         return set()
-    if user.is_superuser:
+    if user.is_superuser or not conf.valor("EXIGIR_PERMISSOES"):
         return None
     registro = _registro(user)
     if registro is None or codigo not in registro.permissoes:
