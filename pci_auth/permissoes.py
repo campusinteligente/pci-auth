@@ -84,6 +84,12 @@ def pode_todas(user, codigos, no=None):
     return all(pode(user, codigo, no) for codigo in codigos)
 
 
+def _negado(codigos):
+    from pci_auth.auditoria import registrar_negado
+
+    registrar_negado(codigos)
+
+
 def exige_permissao(*codigos):
     """Decorator de view: anônimo vai para o login; sem a permissão, 403. Exige todas."""
     if not codigos:
@@ -95,6 +101,7 @@ def exige_permissao(*codigos):
             if not request.user.is_authenticated:
                 return redirect_to_login(request.get_full_path())
             if not pode_todas(request.user, codigos):
+                _negado(codigos)
                 raise PermissionDenied
             return view(request, *args, **kwargs)
 
@@ -116,7 +123,10 @@ class ExigePermissaoMixin(AccessMixin):
         return tuple(self.permissao_exigida)
 
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated or not pode_todas(request.user, self.get_permissao_exigida()):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not pode_todas(request.user, self.get_permissao_exigida()):
+            _negado(self.get_permissao_exigida())
             return self.handle_no_permission()
         return super().dispatch(request, *args, **kwargs)
 
@@ -129,7 +139,12 @@ def permissao_drf(*codigos):
 
     class TemPermissao(BasePermission):
         def has_permission(self, request, view):
-            return bool(request.user and request.user.is_authenticated and pode_todas(request.user, codigos))
+            if not (request.user and request.user.is_authenticated):
+                return False
+            if not pode_todas(request.user, codigos):
+                _negado(codigos)
+                return False
+            return True
 
     TemPermissao.__name__ = f"TemPermissao({', '.join(codigos)})"
     return TemPermissao

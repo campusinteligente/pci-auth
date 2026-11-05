@@ -7,6 +7,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.messages",
     "pci_auth",
+    "tests",  # Coisa, só para a auditoria
 ]
 AUTHENTICATION_BACKENDS = ["pci_auth.backends.AuthServiceBackend"]
 USE_TZ = True

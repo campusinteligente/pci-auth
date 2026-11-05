@@ -42,6 +42,11 @@ PADROES = {
     # API (pci_auth.drf): modelo + ação → código, e quanto tempo guardar as permissões de um Bearer.
     "API_PERMISSOES": {},  # {"produto": {"ler": "produto.ver", "escrever": "produto.editar"}}
     "CACHE_PERMISSOES_TOKEN": 300,
+    # Auditoria (pci_auth.auditoria): desligada até o serviço ligar (e pôr o middleware).
+    "AUDITAR": False,
+    "AUDITAR_APPS": None,  # None = APP_LABELS
+    "AUDITORIA_IGNORAR_CAMPOS": ["password"],
+    "AUDITORIA_DIAS": 365,
 }
 
 _LEGADO = {

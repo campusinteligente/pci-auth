@@ -8,6 +8,8 @@ class PciAuthConfig(AppConfig):
     verbose_name = "PCI Auth"
 
     def ready(self):
+        from pci_auth import auditoria
         from pci_auth.checks import checar
 
         checks.register(checar)
+        auditoria.conectar()
