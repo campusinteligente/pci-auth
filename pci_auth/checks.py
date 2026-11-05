@@ -38,8 +38,21 @@ def verificar_api_permissoes():
     return [Warning("API_PERMISSOES com problemas: " + "; ".join(problemas) + ".", id="pci_auth.W009")]
 
 
+def verificar_auditoria():
+    if not conf.valor("AUDITAR"):
+        return []
+    if "pci_auth.auditoria.AuditoriaMiddleware" in getattr(settings, "MIDDLEWARE", []):
+        return []
+    return [Warning(
+        "AUDITAR ligado sem o AuditoriaMiddleware: as mudanças ficam sem usuário, IP e jti (como 'sistema') "
+        "e os 403 da própria view não são registrados.",
+        hint='Adicione "pci_auth.auditoria.AuditoriaMiddleware" ao MIDDLEWARE, depois do AuthenticationMiddleware.',
+        id="pci_auth.W010",
+    )]
+
+
 def verificar_configuracao():
-    avisos = verificar_api_permissoes()
+    avisos = verificar_api_permissoes() + verificar_auditoria()
     usa_backend = "pci_auth.backends.AuthServiceBackend" in getattr(settings, "AUTHENTICATION_BACKENDS", [])
     if usa_backend and not conf.authservice_url():
         avisos.append(Warning("AUTHSERVICE_URL não configurado: ninguém consegue entrar.", id="pci_auth.W001"))

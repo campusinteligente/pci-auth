@@ -12,6 +12,8 @@ se apresentar ao AuthService: quem ele é e quais permissões existem nele.
   `pode` nos templates, com as permissões que o AuthService calculou para o usuário (a partir da 0.2.0).
 - `pci_auth.drf`: permissões na API (0.4.0): por modelo + ação na API dinâmica e para quem chama com
   token Bearer.
+- `pci_auth.auditoria`: rastreabilidade (0.5.0): quem criou, alterou ou apagou cada registro (antes e
+  depois), por onde, de onde e com qual token; e cada acesso negado.
 - `manage.py sincronizar_permissoes`: roda no deploy. Registra a aplicação (fica pendente até alguém
   aprovar no admin do AuthService) e, depois de aprovada, mantém as permissões declaradas em dia.
 
@@ -22,7 +24,7 @@ se apresentar ao AuthService: quem ele é e quais permissões existem nele.
 
 ```
 # requirements.txt
-pci-auth @ git+https://github.com/campusinteligente/pci-auth@v0.4.0
+pci-auth @ git+https://github.com/campusinteligente/pci-auth@v0.5.0
 ```
 
 Fixe sempre uma tag: cada serviço atualiza quando quiser.
@@ -218,6 +220,39 @@ As permissões valem só naquela requisição (nada é gravado):
 
 A consulta ao AuthService fica no cache do Django enquanto o token vale, até
 `CACHE_PERMISSOES_TOKEN` segundos (padrão 300). Com `EXIGIR_PERMISSOES = False` nada é consultado.
+
+## Auditoria (0.5.0)
+
+```python
+PCI_AUTH = {..., "AUDITAR": True}
+MIDDLEWARE = [
+    ...
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "pci_auth.auditoria.AuditoriaMiddleware",
+    ...
+]
+```
+
+`manage.py migrate` cria a tabela; a consulta fica no admin (**PCI Auth → Auditoria**), só leitura.
+
+Cada registro guarda: quando, quem (usuário e login, que fica mesmo se o usuário for apagado), a ação
+(criado, alterado, excluído, acesso negado), o objeto (`app.model`, id, texto), as mudanças
+(`{campo: [antes, depois]}`; M2M: `{campo: {adicionados|removidos: [ids]}}`), a permissão que faltou
+(no acesso negado), a origem (tela, API com sessão, API com token, admin, sistema), método, caminho, IP,
+aparelho, o **jti** do token e um id da requisição (cabeçalho `X-Requisicao-Id` da resposta).
+
+- **Ligar ao login no AuthService**: o `jti` é o mesmo que o AuthService guarda em Acessos (Pessoa
+  com o campo `jti`, 2026-11). Na tela, vem do token guardado na sessão no login; com Bearer, do token
+  da requisição (`pci_auth.drf.carregar_do_token`).
+- Models auditados: os dos apps em `AUDITAR_APPS` (padrão: `APP_LABELS`). Campos fora:
+  `AUDITORIA_IGNORAR_CAMPOS` (padrão `["password"]`). Textos longos são cortados em 500 caracteres.
+- **Não pega** `queryset.update()`, `bulk_create()` nem SQL direto (o Django não dispara sinais).
+- O registro entra na mesma transação da mudança. Falha ao gravar só vai para o log.
+- Acesso negado: `@exige_permissao`, `ExigePermissaoMixin`, `permissao_drf` e `PermissaoPorModelo`
+  registram o código; qualquer outro 403 a usuário logado é registrado sem código. Anônimo não.
+- Retenção: `manage.py limpar_auditoria [--dias N]` (padrão `AUDITORIA_DIAS` = 365), por exemplo num
+  cron diário. Os registros têm dado pessoal (login, IP): defina a retenção com quem cuida da LGPD.
+- Check `pci_auth.W010`: auditoria ligada sem o middleware.
 
 ## Trocando o backend copiado
 

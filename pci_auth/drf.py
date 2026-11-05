@@ -98,6 +98,9 @@ def _consultar(access, claims, aplicacao):
 
 def carregar_do_token(user, access, claims):
     """Põe em `user` (só nesta requisição) as permissões do token. Ver o topo do módulo."""
+    from pci_auth.auditoria import marcar_token
+
+    marcar_token(claims)
     if user is None or not getattr(user, "is_authenticated", False) or user.is_superuser:
         return
     if not conf.valor("EXIGIR_PERMISSOES"):
@@ -150,4 +153,9 @@ class PermissaoPorModelo(BasePermission):
         if not (user and user.is_authenticated):
             return False
         codigo = codigo_da_api(model_name, request.method)
-        return codigo == "" or pode(user, codigo)
+        if codigo == "" or pode(user, codigo):
+            return True
+        from pci_auth.auditoria import registrar_negado
+
+        registrar_negado([codigo])
+        return False
