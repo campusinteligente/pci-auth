@@ -10,6 +10,8 @@ se apresentar ao AuthService: quem ele é e quais permissões existem nele.
   do backend copiado (grupo exigido, usuário local sem senha, grupos sincronizados).
 - `pci_auth.permissoes`: `pode`, `@exige_permissao`, `ExigePermissaoMixin`, `permissao_drf` e o filtro
   `pode` nos templates, com as permissões que o AuthService calculou para o usuário (a partir da 0.2.0).
+- `pci_auth.drf`: permissões na API (0.4.0): por modelo + ação na API dinâmica e para quem chama com
+  token Bearer.
 - `manage.py sincronizar_permissoes`: roda no deploy. Registra a aplicação (fica pendente até alguém
   aprovar no admin do AuthService) e, depois de aprovada, mantém as permissões declaradas em dia.
 
@@ -20,7 +22,7 @@ se apresentar ao AuthService: quem ele é e quais permissões existem nele.
 
 ```
 # requirements.txt
-pci-auth @ git+https://github.com/campusinteligente/pci-auth@v0.3.0
+pci-auth @ git+https://github.com/campusinteligente/pci-auth@v0.4.0
 ```
 
 Fixe sempre uma tag: cada serviço atualiza quando quiser.
@@ -161,6 +163,61 @@ escopo(request.user, "movimentacao.registrar")          # None = tudo; {"setor_s
   liberarem qualquer usuário logado e ativo (como antes). Marque as views, faça o deploy, atribua os
   papéis no AuthService (o simulador mostra o resultado) e só então ligue, por exemplo
   `config("PCI_AUTH_EXIGIR_PERMISSOES", default=False, cast=bool)` no settings e `True` no `.env`.
+
+## Permissões na API (0.4.0)
+
+Duas portas da API passavam ao largo das permissões: a **API dinâmica** do template
+(`/api/<app>/<model>/`, ler/criar/alterar/apagar qualquer tabela) e as requisições com **Bearer**
+(o login pela web, que grava `PermissoesUsuario`, não acontece nelas).
+
+```python
+# settings_production.py
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+        "pci_auth.drf.PermissaoPorModelo",     # só age em views com get_model() (a DynamicModelViewSet)
+    ],
+    ...
+}
+PCI_AUTH = {
+    ...
+    "API_PERMISSOES": {                         # chave = model_name (minúsculas)
+        "produto": {"ler": "produto.ver", "escrever": "produto.editar"},
+        "solicitacaoproduto": {"ler": "solicitacao.ver", "criar": "solicitacao.criar",
+                               "alterar": "solicitacao.atender", "apagar": "solicitacao.atender"},
+        "setorsub": {"ler": ""},               # "" = basta estar logado
+    },
+}
+```
+
+- Ações: `ler` (GET/HEAD/OPTIONS), `criar` (POST), `alterar` (PUT/PATCH), `apagar` (DELETE);
+  `escrever` vale para as três últimas.
+- **Model ou ação fora do mapa fica fechado** (só o superusuário) quando a exigência está ligada.
+- O check `pci_auth.W009` avisa ação desconhecida ou código que não está em `PERMISSOES`.
+
+Para o Bearer, chame `carregar_do_token` na classe de autenticação JWT do serviço:
+
+```python
+from pci_auth.drf import carregar_do_token
+
+class AuthServiceJWTAuthentication(JWTAuthentication):
+    def authenticate(self, request):
+        resultado = super().authenticate(request)
+        if resultado is not None:
+            user, token = resultado
+            carregar_do_token(user, self.get_raw_token(self.get_header(request)), token.payload)
+        return resultado
+```
+
+As permissões valem só naquela requisição (nada é gravado):
+
+- token desta aplicação (`aud` = `SLUG`): os claims, ou `GET /api/permissoes/me/`;
+- token sem `aud` (outro serviço que consome esta API sem `client_id`):
+  `GET /api/permissoes/me/?aplicacao=<SLUG>`;
+- token de outra aplicação: nenhuma permissão.
+
+A consulta ao AuthService fica no cache do Django enquanto o token vale, até
+`CACHE_PERMISSOES_TOKEN` segundos (padrão 300). Com `EXIGIR_PERMISSOES = False` nada é consultado.
 
 ## Trocando o backend copiado
 

@@ -39,6 +39,9 @@ PADROES = {
     # Permissões (pci_auth.permissoes). False: checagens liberam qualquer usuário logado e ativo,
     # para o serviço ir ao ar com as views marcadas antes de os papéis estarem atribuídos.
     "EXIGIR_PERMISSOES": True,
+    # API (pci_auth.drf): modelo + ação → código, e quanto tempo guardar as permissões de um Bearer.
+    "API_PERMISSOES": {},  # {"produto": {"ler": "produto.ver", "escrever": "produto.editar"}}
+    "CACHE_PERMISSOES_TOKEN": 300,
 }
 
 _LEGADO = {
