@@ -16,8 +16,30 @@ SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 CODIGO_PERMISSAO = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_]+)*$")
 
 
+def verificar_api_permissoes():
+    """API_PERMISSOES só com ações conhecidas e, se o serviço declara PERMISSOES, códigos de lá."""
+    mapa = conf.valor("API_PERMISSOES") or {}
+    if not isinstance(mapa, dict):
+        return [Warning("API_PERMISSOES deve ser um dict {model: {acao: codigo}}.", id="pci_auth.W008")]
+    declaradas = conf.valor("PERMISSOES") or {}
+    acoes = {"ler", "criar", "alterar", "apagar", "escrever"}
+    problemas = []
+    for model, regras in sorted(mapa.items()):
+        if not isinstance(regras, dict):
+            problemas.append(f"{model}: esperado {{acao: codigo}}")
+            continue
+        for acao, codigo in sorted(regras.items()):
+            if acao not in acoes:
+                problemas.append(f"{model}.{acao}: ação desconhecida (use {', '.join(sorted(acoes))})")
+            elif codigo and declaradas and isinstance(declaradas, dict) and codigo not in declaradas:
+                problemas.append(f"{model}.{acao}: '{codigo}' não está em PERMISSOES")
+    if not problemas:
+        return []
+    return [Warning("API_PERMISSOES com problemas: " + "; ".join(problemas) + ".", id="pci_auth.W009")]
+
+
 def verificar_configuracao():
-    avisos = []
+    avisos = verificar_api_permissoes()
     usa_backend = "pci_auth.backends.AuthServiceBackend" in getattr(settings, "AUTHENTICATION_BACKENDS", [])
     if usa_backend and not conf.authservice_url():
         avisos.append(Warning("AUTHSERVICE_URL não configurado: ninguém consegue entrar.", id="pci_auth.W001"))

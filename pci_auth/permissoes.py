@@ -44,6 +44,16 @@ def _registro(user):
     return None if registro is _SEM_REGISTRO else registro
 
 
+def usar_nesta_requisicao(user, permissoes, escopo=None):
+    """
+    Permissões que valem só para este objeto `user` (esta requisição), sem gravar nada.
+    Usado pela API com Bearer: as permissões vêm do token, não do último login pela web.
+    """
+    from types import SimpleNamespace
+
+    setattr(user, _CACHE, SimpleNamespace(permissoes=list(permissoes or []), escopo=dict(escopo or {})))
+
+
 def esquecer(user):
     """Descarta o que foi guardado no objeto (depois de regravar as permissões)."""
     if hasattr(user, _CACHE):

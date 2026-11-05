@@ -1,5 +1,7 @@
 """Chamadas HTTP ao AuthService."""
 
+from urllib.parse import quote
+
 import requests
 
 from pci_auth import conf
@@ -69,6 +71,12 @@ def sincronizar(client_id, client_secret):
     return post("/api/aplicacoes/sincronizar/", corpo)
 
 
-def minhas_permissoes(access):
-    """GET /api/permissoes/me/ com o access do usuário (aplicação pelo aud do token)."""
-    return get("/api/permissoes/me/", {"Authorization": f"Bearer {access}"})
+def minhas_permissoes(access, aplicacao=None):
+    """
+    GET /api/permissoes/me/ com o access do usuário. A aplicação vem do aud do token ou,
+    num token sem aud (emitido sem client_id), de `aplicacao`.
+    """
+    caminho = "/api/permissoes/me/"
+    if aplicacao:
+        caminho += f"?aplicacao={quote(aplicacao)}"
+    return get(caminho, {"Authorization": f"Bearer {access}"})
